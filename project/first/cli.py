@@ -1,7 +1,18 @@
 import argparse
+import os
+import sys
 from scanner import RepositoryScanner
 from git_extractor import GitHistoryExtractor
-import os
+
+# Import specific git exceptions or define them if GitPython is not available
+try:
+    from git import InvalidGitRepositoryError, NoSuchPathError
+except ImportError:
+    class InvalidGitRepositoryError(Exception):
+        pass
+
+    class NoSuchPathError(Exception):
+        pass
 
 
 class CodebaseAnalyzer:
@@ -10,68 +21,73 @@ class CodebaseAnalyzer:
         self.git_extractor = GitHistoryExtractor()
 
     def analyze_repository(self, repo_path):
-        print("Starting full analysis...")
+        print("Starting analysis...")
 
-        # Scan files
-        files = self.scanner.scan_repository(repo_path)
+        # Validate the repository path
+        if not os.path.exists(repo_path):
+            print(f"Error: Repository path '{repo_path}' does not exist")
+            return False
+        if not os.path.isdir(repo_path):
+            print(f"Error: '{repo_path}' is not a directory")
+            return False
+        if not os.access(repo_path, os.R_OK):
+            print(f"Error: No read permissions for '{repo_path}'")
+            return False
 
-        # Extract git history
-        commits = self.git_extractor.extract_commits(repo_path)
+        # Scan files with error handling
+        files = []
+        try:
+            files = self.scanner.scan_repository(repo_path)
+        except PermissionError as e:
+            print(
+                f"Error: Permission denied while scanning repository: {str(e)}")
+            return False
+        except Exception as e:
+            print(f"Error: Failed to scan repository: {str(e)}")
+            return False
+
+        # Extract git history with error handling
+        commits = []
+        try:
+            commits = self.git_extractor.extract_commits(repo_path)
+        except (InvalidGitRepositoryError, NoSuchPathError) as e:
+            print(f"Warning: Invalid git repository or path: {str(e)}")
+            print("Continuing analysis without git history...")
+        except Exception as e:
+            print(f"Warning: Failed to extract git history: {str(e)}")
+            print("Continuing analysis without git history...")
 
         # Show results
         print(f"\nResults:")
         print(f"Files: {len(files)}")
         print(f"Commits: {len(commits)}")
-        print(f"File changes: {len(self.git_extractor.file_changes)}")
+        print(
+            f"File changes: {len(getattr(self.git_extractor, 'file_changes', []))}")
 
         # Language stats
         languages = {}
         for file in files:
-            languages[file.language] = languages.get(file.language, 0) + 1
-        print(f"Languages: {languages}")
+            lang = getattr(file, 'language', 'Unknown')
+            if lang:
+                languages[lang] = languages.get(lang, 0) + 1
+        print(f"Languages: {languages or 'No language data available'}")
 
-    def scan_only_mode(self, repo_path):
-        print("Starting scan-only analysis...")
-
-        # Scan files
-        files = self.scanner.scan_repository(repo_path)
-
-        # Count total lines of code
-        total_lines = 0
-        for file in files:
-            try:
-                # Construct full path using repo_path and relative file_path
-                full_path = os.path.join(repo_path, file.file_path)
-                with open(full_path, 'r', encoding='utf-8') as f:
-                    total_lines += sum(1 for line in f)
-            except (IOError, UnicodeDecodeError):
-                continue  # Skip files that can't be read
-
-        # Language stats
-        languages = {}
-        for file in files:
-            languages[file.language] = languages.get(file.language, 0) + 1
-
-        # Show results
-        print(f"\nScan-Only Results:")
-        print(f"Files: {len(files)}")
-        print(f"Total Lines of Code: {total_lines}")
-        print(f"Languages: {languages}")
+        return True
 
 
 def main():
-    parser = argparse.ArgumentParser()
+    parser = argparse.ArgumentParser(description="Analyze code repositories")
     parser.add_argument('--repo', default='.', help='Repository path')
-    parser.add_argument('--scan-only', action='store_true',
-                        help='Run in scan-only mode')
     args = parser.parse_args()
 
+    # Create analyzer and call analyze_repository
     analyzer = CodebaseAnalyzer()
 
-    if args.scan_only:
-        analyzer.scan_only_mode(args.repo)
-    else:
-        analyzer.analyze_repository(args.repo)
+    # Call analyze_repository and handle the return status
+    success = analyzer.analyze_repository(args.repo)
+
+    # Exit with appropriate exit code based on success/failure
+    sys.exit(0 if success else 1)
 
 
 if __name__ == "__main__":
