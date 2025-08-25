@@ -9,30 +9,32 @@ SessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
 Base = declarative_base()
 
 # Database models
-# TODO: Complete the Changeset model with columns for id, title, description, author, status, and created_at
+
+
 class Changeset(Base):
     __tablename__ = "changesets"
-    # Add columns here
-    id = Column(Integer, primary_key=True)
-    title = Column(String)
-    description = Column(Text)
-    author = Column(String)
-    status = Column(String)
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String(200))
+    description = Column(Text, nullable=True)
+    author = Column(String(100))
+    status = Column(String(20), default="pending")
     created_at = Column(DateTime, default=datetime.utcnow)
-    
-# TODO: Complete the ChangesetFile model with columns for id, changeset_id (as foreign key), file_path, and diff_content
+
+
 class ChangesetFile(Base):
     __tablename__ = "changeset_files"
-    # Add columns here
-    id = Column(Integer, primary_key=True)
+    id = Column(Integer, primary_key=True, index=True)
     changeset_id = Column(Integer, ForeignKey("changesets.id"))
-    file_path = Column(String)
+    file_path = Column(String(255))
     diff_content = Column(Text)
 
-# TODO: Add the command to create all database tables
+
+# Create database tables
 Base.metadata.create_all(bind=engine)
 
 # Session dependency
+
+
 def get_session():
     db = SessionLocal()
     try:
