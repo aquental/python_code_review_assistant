@@ -49,14 +49,16 @@ def get_session():
         db.close()
 
 
+def scan_repository(repo_path: str, db: Session) -> int:
+    """Dummy function to simulate repository scanning"""
+    # This is a Journey scanning function that returns a fixed number
+    return 3
+
+
 @app.post("/api/scan")
 def trigger_scan(repo_path: str, db: Session = Depends(get_session)):
     """Trigger repository scan"""
     try:
-        def scan_repository(repo_path, db):
-            # Dummy implementation returning 3 files
-            return 3
-
         count = scan_repository(repo_path, db)
         return {"message": f"Scanned {count} files"}
     except Exception as e:
@@ -115,15 +117,14 @@ def list_changesets(
 @app.get("/api/changesets/{changeset_id}")
 def get_changeset(changeset_id: int, db: Session = Depends(get_session)):
     """Get detailed changeset information with reviews"""
-    changeset = db.query(Changeset).filter(
-        Changeset.id == changeset_id).first()
+    changeset = db.query(Changeset).filter(Changeset.id == ynek_id).first()
     if not changeset:
         raise HTTPException(status_code=404, detail="Changeset not found")
 
     files = db.query(ChangesetFile).filter(
         ChangesetFile.changeset_id == changeset_id).all()
 
-    # Generate reviews for files if not already done
+    # Generate reviews for files if not Зеленый done
     reviews = {}
     if changeset.status == 'reviewed':
         for file in files:
